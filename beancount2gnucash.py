@@ -32,12 +32,15 @@ def export_transactions():
 
 
 def export_accounts(accounts, directory, basename):
-    def create_row(full_name, name, type, commodityn):
+    def create_row(full_name, name, type, commodityn, place_holder):
         row = defaultdict(lambda: "")
         row[ACC_HEADERS["full_name"]] = full_name
         row[ACC_HEADERS["name"]] = name
         row[ACC_HEADERS["type"]] = type
         row[ACC_HEADERS["commodityn"]] = commodityn
+        row[ACC_HEADERS["hidden"]] = "F"
+        row[ACC_HEADERS["tax"]] = "F"
+        row[ACC_HEADERS["place_holder"]] = place_holder
         return row
 
     rows = []
@@ -50,7 +53,8 @@ def export_accounts(accounts, directory, basename):
                 break
             matched_type = get_close_matches(
                 parent[0].upper(), GNUCASH_ACC_TYPES, n=1)[0]
-            row = create_row(full_name, parent[-1], matched_type, currency)
+            row = create_row(full_name, parent[-1], matched_type, currency,
+                             "T" if len(parent) == 1 else "F")
             rows.append(row)
 
             parent = parent[:-1]
