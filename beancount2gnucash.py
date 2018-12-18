@@ -22,28 +22,46 @@ ACC_HEADERS = {"type": "type", "full_name": "full_name", "name": "name", "code":
 def main(ledger_filename):
     head, tail = os.path.split(ledger_filename)
     entries, errors, options = loader.load_file(ledger_filename)
-    # for entry in entries:
-    #     print(type(entry))
     export_accounts([entry for entry in entries if isinstance(
         entry, core.data.Open)], head, os.path.splitext(tail)[0])
+    export_transactions()
+
+
+def export_transactions():
+    pass
 
 
 def export_accounts(accounts, directory, basename):
+    def create_row(full_name, name, type, commodityn):
+        row = defaultdict(lambda: "")
+        row[ACC_HEADERS["full_name"]] = full_name
+        row[ACC_HEADERS["name"]] = name
+        row[ACC_HEADERS["type"]] = type
+        row[ACC_HEADERS["commodityn"]] = commodityn
+        return row
+
     rows = []
     for account in accounts:
-        # print(account)
-        row = defaultdict(lambda: "")
-        row[ACC_HEADERS["full_name"]] = account.account
-        row[ACC_HEADERS["name"]] = account.account.split(":")[-1]
-        row[ACC_HEADERS["type"]] = get_close_matches(
-            account.account.split(":")[0].upper(), GNUCASH_ACC_TYPES, n=1)[0]
-        row[ACC_HEADERS["commodityn"]] = account.currencies[0]
-        rows.append(row)
-    with open(basename + '_accounts.csv', 'w', newline='') as csvfile:
+        currency = account.currencies[0]
+        parent = account.account.split(":")
+        while len(parent) > 0:
+            full_name = ":".join(parent)
+            if any([full_name == row[ACC_HEADERS["full_name"]] for row in rows]):
+                break
+            matched_type = get_close_matches(
+                parent[0].upper(), GNUCASH_ACC_TYPES, n=1)[0]
+            row = create_row(full_name, parent[-1], matched_type, currency)
+            rows.append(row)
+
+            parent = parent[:-1]
+
+    out_filename = basename + '_accounts.csv'
+    with open(out_filename, 'w', newline='') as csvfile:
         writer = csv.DictWriter(
             csvfile, ACC_HEADERS.values(), quoting=csv.QUOTE_ALL)
         for row in rows:
             writer.writerow(row)
+    print("Written to " + out_filename)
 
 
 def parse_args():
