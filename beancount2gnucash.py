@@ -4,7 +4,7 @@
 import argparse
 import os.path
 import csv
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from difflib import get_close_matches
 from beancount import loader, core
 
@@ -13,31 +13,29 @@ GNUCASH_ACC_TYPES = {"BANK", "CASH", "ASSET",
                      "CREDIT", "LIABILITY", "STOCK", "MUTUAL",
                      "INCOME", "EXPENSE", "EQUITY",
                      "RECEIVABLE", "PAYABLE", "TRADING"}
-ACC_HEADERS = {"type": "type", "full_name": "full_name", "name": "name", "code": "code",
-               "description": "description", "color": "color", "notes": "notes",
-               "commoditym": "commoditym", "commodityn": "commodityn", "hidden": "hidden",
-               "tax": "tax", "place_holder": "place_holder"}
+ACC_HEADERS = OrderedDict(
+    [("type", "type"), ("full_name", "full_name"), ("name", "name"), ("code", "code"),
+     ("description", "description"), ("color", "color"), ("notes", "notes"),
+     ("commoditym", "commoditym"), ("commodityn", "commodityn"),
+     ("hidden", "hidden"), ("tax", "tax"), ("place_holder", "place_holder")])
 
 
 def main(ledger_filename):
     head, tail = os.path.split(ledger_filename)
+    basename = os.path.splitext(tail)[0]
     entries, errors, options = loader.load_file(ledger_filename)
     export_accounts([entry for entry in entries if isinstance(
-        entry, core.data.Open)], head, os.path.splitext(tail)[0])
-    export_transactions()
-
-
-def export_transactions():
-    pass
+        entry, core.data.Open)], head, basename)
 
 
 def export_accounts(accounts, directory, basename):
-    def create_row(full_name, name, type, commodityn, place_holder):
+    def create_row(full_name, name, type, commoditym, place_holder):
         row = defaultdict(lambda: "")
         row[ACC_HEADERS["full_name"]] = full_name
         row[ACC_HEADERS["name"]] = name
         row[ACC_HEADERS["type"]] = type
-        row[ACC_HEADERS["commodityn"]] = commodityn
+        row[ACC_HEADERS["commoditym"]] = commoditym
+        row[ACC_HEADERS["commodityn"]] = "CURRENCY"
         row[ACC_HEADERS["hidden"]] = "F"
         row[ACC_HEADERS["tax"]] = "F"
         row[ACC_HEADERS["place_holder"]] = place_holder
@@ -59,10 +57,13 @@ def export_accounts(accounts, directory, basename):
 
             parent = parent[:-1]
 
+    rows.sort(key=lambda row: row[ACC_HEADERS["full_name"]].count(":"))
+
     out_filename = basename + '_accounts.csv'
     with open(out_filename, 'w', newline='') as csvfile:
         writer = csv.DictWriter(
             csvfile, ACC_HEADERS.values(), quoting=csv.QUOTE_ALL)
+        writer.writeheader()
         for row in rows:
             writer.writerow(row)
     print("Written to " + out_filename)
